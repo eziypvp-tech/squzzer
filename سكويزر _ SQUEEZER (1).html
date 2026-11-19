@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>سكويزر | SQUEEZER</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--p:#56264F;--s:#8D4B78;--l:#F3E4EE;--bg:#FAF8FA;--t:#201820;--a:#BFE9D9;--c:#fff;--b:#e4d6e0;--bt:#fff;--bad:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#171117;--t:#f6eef4;--c:#251a24;--l:#38243a;--b:#46344a;--p:#d9a6cb;--bt:#201820;--s:#c58ab5;--bad:#ff8a80}}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--t);font-family:Cairo,Tahoma,sans-serif;line-height:1.7}
+.top{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--p);color:var(--bt);flex-wrap:wrap}
+.top b{font-size:1.2rem}.nav{display:flex;gap:6px;flex-wrap:wrap}
+.nav button{background:transparent;color:var(--bt);border:1px solid transparent;opacity:.8}
+.nav button.on{border-color:var(--bt);opacity:1}
+main{max-width:1000px;margin:0 auto;padding:16px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:14px;padding:14px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--l);border-radius:12px;padding:12px}.stat b{display:block;font-size:1.6rem}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--b);border-radius:10px;background:var(--bg);color:var(--t);max-width:100%}
+button{font:inherit;padding:8px 14px;border:0;border-radius:10px;background:var(--p);color:var(--bt);cursor:pointer}
+button.g{background:var(--l);color:var(--t)}button.d{background:var(--bad);color:#fff}button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--s);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.tag{padding:2px 10px;border-radius:99px;font-size:.85rem;background:var(--a);color:#201820}.tag.x{background:#f6c9c4}.tag.w{background:#fde9b0}
+.msg{padding:10px;border-radius:10px;background:var(--a);color:#201820;margin-bottom:10px}.msg.e{background:#f6c9c4}
+.dots{display:flex;gap:5px;flex-wrap:wrap}.dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--bc,var(--p))}.dot.f{background:var(--bc,var(--p))}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}td,th{padding:6px 8px;border-bottom:1px solid var(--b);text-align:start;white-space:nowrap}
+.login{max-width:380px;margin:8vh auto}small{opacity:.75}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script></head><body><div id="app"></div>
+<script>
+const BASE='https://claude.ai/artifact/8tPmohSEMdtvWA4Wo83U13';const K='squeezer_v1';let lm='c',cs=null,jr=false,tab='n';window.addEventListener('hashchange',()=>{msg=null;render()});let S,me=null,view='dash',msg=null,filt='';
+const load=()=>{try{return JSON.parse(localStorage.getItem(K))||null}catch(e){return null}};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const H=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+const v=i=>(document.getElementById(i)||{}).value||'';
+const id=()=>crypto.randomUUID();
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=p=>p.replace(/\D/g,'').replace(/^0+/,'');
+const fd=t=>new Date(t).toLocaleDateString('ar-EG');
+const brand=i=>S.brands.find(b=>b.id===i);
+const subOk=b=>b&&['active','trial'].includes(b.sub.status)&&b.sub.exp>Date.now();
+const SL={pending:'معلّق بالتفعيل',trial:'تجريبي',active:'نشط',expired:'منتهي',suspended:'موقوف'};
+S=load()||{admin:null,brands:[],cashiers:[],customers:[],tx:[]};
+S.brands.forEach(b=>{if(['active','trial'].includes(b.sub.status)&&b.sub.exp<=Date.now())b.sub.status='expired'});save();
+const say=(m,e)=>{msg={m,e};render()};
+const go=x=>{view=x;msg=null;render()};
+
+async function setup(){const e=v('em'),p=v('pw');if(!e.includes('@')||p.length<8)return say('أدخل بريدًا صحيحًا وكلمة مرور من 8 أحرف على الأقل',1);
+S.admin={email:e.toLowerCase(),h:await H(p)};save();say('تم إنشاء حساب المالك. سجّل الدخول الآن.')}
+async function login(){const u=v('us').toLowerCase().trim(),h=await H(v('pw')),r=lm==='a'?'admin':'cashier';
+if(r==='admin'){if(S.admin.email===u&&S.admin.h===h){me={role:'admin'};view='dash';msg=null;return render()}}
+else{const c=S.cashiers.find(c=>(c.user===u||c.email===u)&&c.h===h);if(c){if(!c.active)return say('الحساب موقوف',1);me={role:'cashier',id:c.id};view='work';msg=null;return render()}}
+say('بيانات الدخول غير صحيحة',1)}
+const logout=()=>{me=null;msg=null;render()};
+
+function addBrand(){const n=v('bn').trim();if(!n)return say('اسم العلامة مطلوب',1);
+S.brands.push({id:id(),name:n,en:v('be'),cat:v('bc'),ic:(CATS.find(c=>c[0]===v('bc'))||[])[1]||'⭐',color:v('bcol')||'#56264F',stamps:+v('bs')||8,ptsPer:+v('bp')||1,minSpend:+v('bm')||0,sub:{status:'pending',exp:0,plan:'',hist:[]},created:Date.now()});
+log('إنشاء علامة: '+n);save();say('تم إنشاء العلامة باشتراك غير مفعّل')}
+function activate(i){const d=+v('d'+i);const b=brand(i);const base=Math.max(Date.now(),b.sub.exp);b.sub.exp=base+d*864e5;b.sub.status=d===7?'trial':'active';
+b.sub.hist.push({at:Date.now(),days:d});log(`تفعيل اشتراك ${b.name} (${d} يوم)`);save();say('تم تفعيل الاشتراك')}
+function suspend(i){const b=brand(i);b.sub.status='suspended';log('إيقاف اشتراك '+b.name);save();say('تم إيقاف الاشتراك')}
+async function addCashier(){const n=v('cn').trim(),u=v('cu').toLowerCase().trim(),p=v('cp'),b=v('cb'),col=v('cc')||'#56264F';
+if(!n||!u||p.length<8||!b)return say('أكمل البيانات (كلمة المرور 8 أحرف على الأقل)',1);
+if(S.cashiers.some(c=>c.user===u))return say('اسم المستخدم مستخدم',1);
+S.cashiers.push({id:id(),name:n,user:u,h:await H(p),brandId:b,color:col,active:true,created:Date.now()});log('إنشاء كاشير: '+n);save();say('تم إنشاء حساب الكاشير')}
+function togC(i){const c=S.cashiers.find(c=>c.id===i);c.active=!c.active;log((c.active?'تفعيل':'إيقاف')+' كاشير '+c.name);save();render()}
+function setC(i,col){const c=S.cashiers.find(c=>c.id===i);c.color=col;log('تغيير لون صفحة كاشير '+c.name);save();say('تم تغيير لون صفحة الكاشير')}
+function log(a){S.tx.push({id:id(),type:'audit',note:a,ts:Date.now()})}
+
+function cur(){return S.cashiers.find(c=>c.id===me.id)}
+function guard(){const c=cur();if(!c||!c.active){me=null;say('تم سحب صلاحية الحساب',1);return null}
+const b=brand(c.brandId);if(!subOk(b)){say('اشتراك العلامة غير نشط، العمليات متوقفة',1);return null}return{c,b}}
+async function regCust(){const g=guard();if(!g)return;const n=v('xn').trim(),p=norm(v('xp')),k=v('xk');if(!/^\d{4}$/.test(k))return say('الرمز السري 4 أرقام',1);if(!n||p.length<7)return say('الاسم ورقم هاتف صحيح مطلوبان',1);
+if(S.customers.some(x=>x.brandId===g.b.id&&x.phone===p))return say('العميل مسجّل مسبقًا في هذه العلامة',1);
+S.customers.push({id:id(),brandId:g.b.id,name:n,phone:p,stamps:0,points:0,rewards:0,redeemed:0,created:Date.now(),pin:await H(k)});save();say('تم تسجيل العميل وإنشاء بطاقته')}
+function buy(ci){const g=guard();if(!g)return;const amt=+v('a'+ci);if(!(amt>0))return say('أدخل مبلغًا صحيحًا',1);
+const c=S.customers.find(x=>x.id===ci&&x.brandId===g.b.id);if(!c)return say('عميل غير مصرح',1);
+const key=ci+'|'+amt+'|'+Math.floor(Date.now()/3000);if(S.tx.some(t=>t.key===key))return say('تم تجاهل عملية مكررة',1);
+let st=0,pt=0;if(amt>=g.b.minSpend){st=1;pt=Math.floor(amt*g.b.ptsPer)}
+c.stamps+=st;c.points+=pt;if(c.stamps>=g.b.stamps){c.stamps-=g.b.stamps;c.rewards++}
+S.tx.push({id:id(),key,type:'purchase',brandId:g.b.id,custId:ci,by:g.c.id,amount:amt,stamps:st,points:pt,ts:Date.now()});save();say(`تمت العملية: +${st} ختم، +${pt} نقطة`)}
+function redeem(ci){const g=guard();if(!g)return;const c=S.customers.find(x=>x.id===ci&&x.brandId===g.b.id);
+if(!c||c.rewards<1)return say('لا توجد مكافأة متاحة',1);c.rewards--;c.redeemed++;
+S.tx.push({id:id(),type:'redeem',brandId:g.b.id,custId:ci,by:g.c.id,ts:Date.now()});save();say('تم صرف المكافأة')}
+
+function nav(items){return `<div class="nav">${items.map(([k,t])=>`<button class="${view===k?'on':''}" onclick="go('${k}')">${t}</button>`).join('')}</div>`}
+function custRows(list,ops){const B=i=>brand(i);return `<div class="scroll"><table><tr><th>الاسم</th><th>الهاتف</th><th>العلامة</th><th>الأختام</th><th>نقاط</th><th>مكافآت</th>${ops?'<th>عملية</th>':''}</tr>`+
+list.map(c=>{const b=B(c.brandId);const d=Array.from({length:b.stamps},(_,i)=>`<i class="dot ${i<c.stamps?'f':''}"></i>`).join('');
+return `<tr><td>${esc(c.name)}</td><td dir="ltr">${esc(c.phone)}</td><td>${esc(b.name)}</td><td><div class="dots" style="--bc:${me&&me.role==='cashier'?'var(--p)':esc(b.color)}">${d}</div></td><td>${c.points}</td><td>${c.rewards}</td>${ops?`<td><div class="row"><input id="a${c.id}" type="number" min="0" placeholder="المبلغ" style="width:90px"><button onclick="buy('${c.id}')">شراء</button><button class="g" ${c.rewards?'':'disabled'} onclick="redeem('${c.id}')">صرف</button></div></td>`:''}</tr>`}).join('')+`</table></div>`||''}
+
+function adminView(){if(view==='ba')return baView();
+if(view==='dash'){const ab=S.brands.filter(subOk).length;return `<div class="grid">${[['العلامات',S.brands.length],['نشطة',ab],['منتهية/موقوفة',S.brands.filter(b=>['expired','suspended'].includes(b.sub.status)).length],['العملاء',S.customers.length],['الكاشير',S.cashiers.length],['العمليات',S.tx.filter(t=>t.type==='purchase').length],['مكافآت مصروفة',S.tx.filter(t=>t.type==='redeem').length]].map(([a,b])=>`<div class="stat"><small>${a}</small><b>${b}</b></div>`).join('')}</div>
+<div class="card" style="margin-top:12px"><b>تنبيهات الاشتراك</b>${S.brands.filter(b=>subOk(b)&&b.sub.exp-Date.now()<7*864e5).map(b=>`<div>${esc(b.name)} ينتهي ${fd(b.sub.exp)}</div>`).join('')||'<div><small>لا توجد اشتراكات قريبة الانتهاء</small></div>'}</div>`}
+if(view==='brands')return `<div class="card"><b>علامة جديدة</b><div class="row"><input id="bn" placeholder="الاسم بالعربية"><input id="be" placeholder="الاسم بالإنجليزية" dir="ltr"><input id="bc" type="hidden" value="مقهى"><input id="bcol" type="color" value="#6F4E37" aria-label="اللون"></div>
+<div class="row" id="chips">${CATS.map((c,i)=>`<button class="${i?'g':''}" onclick="pick(${i})">${c[1]} ${c[0]}</button>`).join('')}</div><div class="row"><label>أختام للمكافأة <input id="bs" type="number" value="8" min="1" style="width:70px"></label><label>نقاط لكل وحدة <input id="bp" type="number" value="1" min="0" style="width:70px"></label><label>حد أدنى للشراء <input id="bm" type="number" value="0" min="0" style="width:80px"></label><button onclick="addBrand()">حفظ العلامة</button></div></div>`+
+(S.brands.map(b=>`<div class="card" style="border-top:6px solid ${esc(b.color)}"><div class="row"><b>${esc(b.name)}</b><small dir="ltr">${esc(b.en)}</small><span class="tag ${subOk(b)?'':'x'}">${SL[b.sub.status]}</span><small>${esc(b.cat)} · العملاء ${S.customers.filter(c=>c.brandId===b.id).length}${b.sub.exp?' · ينتهي '+fd(b.sub.exp):''}</small></div>
+<div class="row"><select id="d${b.id}"><option value="7">تجربة 7 أيام</option><option value="30">شهري</option><option value="90">ربع سنوي</option><option value="365">سنوي</option></select><button onclick="activate('${b.id}')">تفعيل / تجديد</button><button class="d" onclick="suspend('${b.id}')">إيقاف</button></div><div class="row"><div style="width:110px;background:#fff;padding:4px;border-radius:8px">${qr(BASE+'#b-'+b.id)}</div><div><b>كود تسجيل عملاء ${esc(b.name)}</b><br><a href="${BASE}#b-${b.id}" target="_blank" rel="noopener">معاينة صفحة التسجيل</a></div></div><div class="row"><label>واتساب المطعم <input id="w${b.id}" value="${esc(b.wa||'')}" placeholder="2010xxxxxxxx" dir="ltr" style="width:150px"></label><label>رابط تقييم جوجل <input id="g${b.id}" value="${esc(b.gmap||'')}" placeholder="https://..." dir="ltr" style="width:210px"></label><label><input type="checkbox" id="fm${b.id}" ${b.feat&&b.feat.menu?'checked':''}> منيو</label><label><input type="checkbox" id="fr${b.id}" ${b.feat&&b.feat.rev?'checked':''}> تقييم جوجل</label><button onclick="saveSet('${b.id}')">حفظ</button></div>${qrPanel(b)}</div>`).join('')||'<div class="card"><small>لا توجد علامات بعد. أنشئ أول علامة.</small></div>');
+if(view==='cash')return `<div class="card"><b>حساب كاشير جديد</b><div class="row"><input id="cn" placeholder="الاسم"><input id="cu" placeholder="اسم المستخدم" dir="ltr"><input id="cp" type="password" placeholder="كلمة المرور"><input id="cc" type="color" value="#56264F" aria-label="لون صفحة الكاشير"><select id="cb">${S.brands.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select><button onclick="addCashier()">إنشاء</button></div></div>`+
+`<div class="card scroll"><table><tr><th>الاسم</th><th>المستخدم</th><th>العلامة</th><th>اللون</th><th>الحالة</th><th></th></tr>${S.cashiers.map(c=>`<tr><td>${esc(c.name)}</td><td dir="ltr">${esc(c.user)}</td><td>${esc(brand(c.brandId).name)}</td><td><input type="color" value="${esc(c.color||'#56264F')}" aria-label="لون صفحة ${esc(c.name)}" onchange="setC('${c.id}',this.value)"></td><td><span class="tag ${c.active?'':'x'}">${c.active?'نشط':'موقوف'}</span></td><td><button class="g" onclick="togC('${c.id}')">${c.active?'إيقاف':'تفعيل'}</button></td></tr>`).join('')}</table></div>`;
+if(view==='cust')return `<div class="card"><select onchange="filt=this.value;render()"><option value="">كل العلامات</option>${S.brands.map(b=>`<option value="${b.id}" ${filt===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div><div class="card">${S.customers.length?custRows(S.customers.filter(c=>!filt||c.brandId===filt),false):'<small>لا يوجد عملاء بعد. يسجّلهم الكاشير.</small>'}</div>`;
+return `<div class="card scroll"><table><tr><th>الوقت</th><th>النوع</th><th>التفاصيل</th></tr>${S.tx.slice(-60).reverse().map(t=>`<tr><td>${new Date(t.ts).toLocaleString('ar-EG')}</td><td>${t.type==='audit'?'تدقيق':t.type==='purchase'?'شراء':'صرف'}</td><td>${t.type==='audit'?esc(t.note):t.type==='purchase'?'مبلغ '+t.amount+' · +'+t.stamps+' ختم · +'+t.points+' نقطة':'صرف مكافأة'}</td></tr>`).join('')}</table></div>`}
+
+function cashierView(){const c=cur();if(!c){me=null;return render(),''}const b=brand(c.brandId),ok=subOk(b);
+const my=S.customers.filter(x=>x.brandId===b.id&&(!filt||x.name.includes(filt)||x.phone.includes(norm(filt))));
+return `<div class="card" style="border-top:6px solid var(--p)"><b>${esc(b.name)}</b> <span class="tag ${ok?'':'x'}">${SL[b.sub.status]}</span>${ok?'':'<div class="msg e" style="margin-top:8px">اشتراك العلامة غير نشط. لا يمكن تسجيل عمليات أو صرف مكافآت. بياناتك محفوظة.</div>'}</div>
+<div class="card"><div class="row"><small>كود البراند الثابت للعملاء:</small><div style="width:90px;background:#fff;padding:4px;border-radius:8px">${qr(BASE+'#b-'+b.id)}</div></div><video id="cam" playsinline muted style="display:none;width:100%;border-radius:12px"></video></div>
+<div class="card"><b>تسجيل عميل</b><div class="row"><input id="xn" placeholder="الاسم"><input id="xp" placeholder="رقم الهاتف" dir="ltr" inputmode="tel"><input id="xk" placeholder="رمز سري 4 أرقام" inputmode="numeric" maxlength="4" style="width:130px"><button ${ok?'':'disabled'} onclick="regCust()">تسجيل</button></div></div>
+<div class="card"><div class="row"><input placeholder="بحث بالاسم أو الهاتف" value="${esc(filt)}" onchange="filt=this.value;render()"></div>${my.length?custRows(my,ok):'<small>لا يوجد عملاء. سجّل أول عميل.</small>'}</div>`}
+
+function themeOf(){const c=cur();if(!c)return'';const hx=(c.color||'#56264F').replace('#','');const n=parseInt(hx,16),r=n>>16,g=n>>8&255,bl=n&255;const L=(.299*r+.587*g+.114*bl)/255;return `--p:#${hx};--s:#${hx};--bt:${L>.6?'#201820':'#fff'}`}
+const mh=()=>msg?`<div class="msg ${msg.e?'e':''}" role="status">${esc(msg.m)}</div>`:'';
+function th(col){const hx=col.replace('#','');const n=parseInt(hx,16),r=n>>16,g=n>>8&255,bl=n&255;const L=(.299*r+.587*g+.114*bl)/255;return `--p:#${hx};--s:#${hx};--bt:${L>.6?'#201820':'#fff'}`}
+function qr(t){try{const q=qrcode(0,'M');q.addData(t);q.make();return q.createSvgTag({cellSize:4,margin:0,scalable:true})}catch(e){return'<small>تعذر رسم الكود</small>'}}
+function selfReg(i){const b=brand(i);if(!subOk(b))return say('التسجيل غير متاح',1);const n=v('jn').trim(),p=norm(v('jp'));if(!n||p.length<7)return say('الاسم ورقم هاتف صحيح مطلوبان',1);
+if(S.customers.some(x=>x.brandId===i&&x.phone===p))return say('أنت مسجّل بالفعل. اطلب كارتك من الكاشير.',1);
+const c={id:id(),brandId:i,name:n,phone:p,stamps:0,points:0,rewards:0,redeemed:0,created:Date.now(),source:'qr'};S.customers.push(c);save();location.hash='c-'+c.id}
+function joinPage(i){const b=brand(i);if(!b)return['<div class="login card">الرابط غير صحيح</div>','#56264F'];
+if(!subOk(b))return[`<div class="login card"><h2>${esc(b.name)}</h2><p>التسجيل غير متاح حاليًا.</p></div>`,b.color];
+return[`<div class="login card" style="border-top:8px solid var(--p)"><h2>${esc(b.name)}</h2><p>سجّل بياناتك لتحصل على كارت الولاء الخاص بك فورًا.</p>${mh()}<div class="row"><input id="jn" placeholder="الاسم"></div><div class="row"><input id="jp" placeholder="رقم الهاتف" dir="ltr" inputmode="tel"></div><button onclick="selfReg('${b.id}')">احصل على الكارت</button></div>`,b.color]}
+function cardPage(i){const c=S.customers.find(x=>x.id===i);if(!c)return['<div class="login card">الكارت غير موجود</div>','#56264F'];const b=brand(c.brandId);
+const d=Array.from({length:b.stamps},(_,k)=>`<i class="dot ${k<c.stamps?'f':''}"></i>`).join('');
+return[`<div class="login card" style="border-top:8px solid var(--p);text-align:center"><h2>${esc(b.name)}</h2><p>${esc(c.name)}</p><div class="dots" style="justify-content:center">${d}</div><p>${c.stamps}/${b.stamps} أختام · ${c.points} نقطة · ${c.rewards} مكافأة جاهزة</p><div style="width:200px;margin:auto;background:#fff;padding:6px;border-radius:12px">${qr(BASE+'#c-'+c.id)}</div><small>اعرض الكود للكاشير عند الدفع</small></div>`,b.color]}
+async function scan(){const g=guard();if(!g)return;if(!('BarcodeDetector' in window))return say('المتصفح لا يدعم مسح QR هنا. ابحث برقم الهاتف.',1);
+try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const vd=document.getElementById('cam');vd.srcObject=st;vd.style.display='block';await vd.play();const d=new BarcodeDetector({formats:['qr_code']});
+const t=setInterval(async()=>{try{const r=await d.detect(vd);if(r.length){clearInterval(t);st.getTracks().forEach(x=>x.stop());const m=r[0].rawValue.match(/#c-([\w-]+)/);const c=m&&S.customers.find(x=>x.id===m[1]&&x.brandId===g.b.id);if(c){filt=c.phone;say('تم العثور على العميل: '+c.name)}else say('كارت غير صالح لهذه العلامة',1)}}catch(e){}},400)}catch(e){say('تعذر تشغيل الكاميرا',1)}}
+const CATS=[['مقهى','☕','#6F4E37',8],['مطعم','🍽️','#B23A2E',10],['مخبز','🥐','#C98B3C',8],['صالون','💇','#8D4B78',6],['حلاقة','✂️','#2F4858',8],['غسيل سيارات','🚗','#1E6FA8',5],['سوبرماركت','🛒','#2E7D4F',10],['أزياء','👗','#C2185B',6],['متجر','🛍️','#56264F',8]];
+function pick(i){const c=CATS[i];document.getElementById('bc').value=c[0];document.getElementById('bcol').value=c[2];document.getElementById('bs').value=c[3];document.querySelectorAll('#chips button').forEach((x,k)=>x.className=k===i?'':'g')}
+function loginHtml(m){const a=lm==='a';const top=`<div class="top"><button class="g" onclick="lm='${a?'c':'a'}';msg=null;render()">${a?'← كاشير':'Admin'}</button><b>سكويزر | SQUEEZER</b></div>`;let body;
+if(a&&!S.admin)body=`<h2>إعداد المالك</h2><p>إعداد لمرة واحدة: أنشئ حساب مالك المنصة.</p>${m}<div class="row"><input id="em" placeholder="البريد" dir="ltr" type="email"></div><div class="row"><input id="pw" type="password" placeholder="كلمة المرور (8+)"></div><button onclick="setup()">إنشاء حساب المالك</button>`;
+else body=`<h2>${a?'تسجيل دخول الإداري':'كاشير'}</h2>${m}<div class="row"><input id="us" placeholder="${a?'البريد':'اسم المستخدم'}" dir="ltr"></div><div class="row"><input id="pw" type="password" placeholder="كلمة المرور"></div><button onclick="login()">دخول</button>`;
+return top+`<div class="login card">${body}</div>`}
+async function cReg(i){const b=brand(i);if(!subOk(b))return say('التسجيل غير متاح',1);const n=v('jn').trim(),p=norm(v('jp')),k=v('jk');
+if(!n||p.length<7||!/^\d{4}$/.test(k))return say('الاسم ورقم هاتف صحيح ورمز سري من 4 أرقام مطلوبة',1);
+if(S.customers.some(x=>x.brandId===i&&x.phone===p))return say('هذا الرقم مسجّل بالفعل. استخدم "لدي حساب".',1);
+const c={id:id(),brandId:i,name:n,phone:p,pin:await H(k),stamps:0,points:0,rewards:0,redeemed:0,created:Date.now(),source:'qr'};S.customers.push(c);save();cs=c.id;jr=true;msg=null;render()}
+async function cIn(i){const p=norm(v('jp')),h=await H(v('jk'));const c=S.customers.find(x=>x.brandId===i&&x.phone===p&&x.pin===h);if(!c)return say('الرقم أو الرمز السري غير صحيح',1);cs=c.id;jr=false;msg=null;render()}
+function cPage(i){const b=brand(i);if(!b)return['<div class="login card">الرابط غير صحيح</div>','#56264F'];const c=cs&&S.customers.find(x=>x.id===cs&&x.brandId===i);
+if(c){const my=S.tx.filter(x=>x.custId===c.id&&x.type!=='audit').slice(-20).reverse();const d=Array.from({length:b.stamps},(_,k)=>`<span style="opacity:${k<c.stamps?1:.25};font-size:1.4rem">${esc(b.ic||'⭐')}</span>`).join('');
+return[`<div class="login card" style="border-top:8px solid var(--p)"><h2>${esc(b.ic||'')} ${esc(b.name)}</h2>${jr?'<div class="msg">🎉 تم تسجيلك لأول مرة. أهلًا بك!</div>':''}<div class="card"><small>بياناتك (للعرض فقط)</small><div>الاسم: <b>${esc(c.name)}</b></div><div>الهاتف: <b dir="ltr">${esc(c.phone)}</b></div><div>تاريخ التسجيل: <b>${fd(c.created)}</b></div></div><div class="card"><div>${d}</div><p>${c.stamps}/${b.stamps} أختام · ${c.points} نقطة · ${c.rewards} مكافأة جاهزة · صُرف ${c.redeemed}</p></div><div class="card"><small>آخر عملياتك</small>${my.map(x=>`<div>${fd(x.ts)} · ${x.type==='purchase'?'شراء '+x.amount+' (+'+x.stamps+' ختم، +'+x.points+' نقطة)':'صرف مكافأة'}</div>`).join('')||'<div><small>لا توجد عمليات بعد</small></div>'}</div><button class="g" onclick="cs=null;jr=false;render()">خروج</button></div>`,b.color]}
+const t=tab==='n';return[`<div class="login card" style="border-top:8px solid var(--p)"><h2>${esc(b.ic||'')} ${esc(b.name)}</h2><div class="row"><button class="${t?'':'g'}" onclick="tab='n';msg=null;render()">عميل جديد</button><button class="${t?'g':''}" onclick="tab='o';msg=null;render()">لدي حساب</button></div>${mh()}${t?'<p>سجّل لأول مرة واحصل على كارت الولاء.</p><div class="row"><input id="jn" placeholder="الاسم"></div>':''}<div class="row"><input id="jp" placeholder="رقم الهاتف" dir="ltr" inputmode="tel"></div><div class="row"><input id="jk" type="password" placeholder="رمز سري 4 أرقام" inputmode="numeric" maxlength="4"></div><button onclick="${t?'cReg':'cIn'}('${b.id}')" ${t&&!subOk(b)?'disabled':''}>${t?'تسجيل':'دخول'}</button></div>`,b.color]}
+S.bAdmins=S.bAdmins||[];let ed=null,tmpImg='',cart={},note='';
+const mn=b=>b.menu||(b.menu={cats:[],items:[]});
+const bcur=()=>S.bAdmins.find(c=>c.id===me.id);
+const mb=()=>{if(!me||me.role!=='badmin'||!bcur())throw 0;return mn(brand(bcur().brandId))};
+const FB=['تجربة جميلة في {n}، الخدمة محترمة والمكان نضيف. أنصح بيه.','من أحلى الأماكن، جودة وتعامل راقي. هرجع تاني إن شاء الله.','{n} فاجئني بجودة الخدمة والتعامل الراقي. تجربة تستحق التكرار.'];
+function saveSet(i){const b=brand(i),g=v('g'+i).trim();if(g&&!/^https:\/\//.test(g))return say('رابط جوجل يجب أن يبدأ بـ https',1);b.wa=norm(v('w'+i));b.gmap=g;b.feat={menu:document.getElementById('fm'+i).checked,rev:document.getElementById('fr'+i).checked};log('تعديل إعدادات '+b.name);save();say('تم حفظ إعدادات العلامة')}
+function qrBox(t,u,f){return `<div style="text-align:center"><div style="width:120px;background:#fff;padding:5px;border-radius:8px">${qr(u)}</div><small>${t}</small><br><button class="g" onclick="dlQR('${u}','${f}')">حفظ PNG</button></div>`}
+function qrPanel(b){const f=b.feat||{},s=b.id.slice(0,6);return `<div class="row">${qrBox('الولاء',BASE+'#b-'+b.id,'loyalty-'+s)}${f.menu?qrBox('المنيو',BASE+'#m-'+b.id,'menu-'+s):''}${f.rev&&b.gmap?qrBox('تقييم جوجل',BASE+'#r-'+b.id,'review-'+s):''}</div>`}
+async function dlQR(u,f){try{const q=qrcode(0,'M');q.addData(u);q.make();const n=q.getModuleCount(),s=10,m=4,c=document.createElement('canvas');c.width=c.height=(n+2*m)*s;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle='#000';for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(q.isDark(r,k))x.fillRect((k+m)*s,(r+m)*s,s,s);
+const bl=await new Promise(r=>c.toBlob(r,'image/png'));const d=await claude.use('downloads');if(!d)return say('الحفظ غير متاح هنا. خذ لقطة شاشة للكود.',1);await d.save({filename:f+'.png',data:bl})}catch(e){if(!e||e.code!=='declined')say('تعذّر حفظ الصورة',1)}}
+async function addBA(){const n=v('an').trim(),u=v('au').toLowerCase().trim(),p=v('ap'),b=v('ab');if(!n||!u||p.length<8||!b)return say('أكمل البيانات (كلمة المرور 8 أحرف على الأقل)',1);if(S.bAdmins.some(c=>c.user===u)||S.cashiers.some(c=>c.user===u))return say('اسم المستخدم مستخدم',1);S.bAdmins.push({id:id(),name:n,user:u,h:await H(p),brandId:b,active:true,created:Date.now()});log('إنشاء أدمن مطعم: '+n);save();say('تم إنشاء أدمن المطعم')}
+function togBA(i){const c=S.bAdmins.find(c=>c.id===i);c.active=!c.active;log((c.active?'تفعيل':'إيقاف')+' أدمن '+c.name);save();render()}
+function baView(){return `<div class="card"><b>أدمن مطعم جديد</b><div class="row"><input id="an" placeholder="الاسم"><input id="au" placeholder="اسم المستخدم" dir="ltr"><input id="ap" type="password" placeholder="كلمة المرور"><select id="ab">${S.brands.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select><button onclick="addBA()">إنشاء</button></div></div><div class="card scroll"><table><tr><th>الاسم</th><th>المستخدم</th><th>العلامة</th><th>الحالة</th><th></th></tr>${S.bAdmins.map(c=>`<tr><td>${esc(c.name)}</td><td dir="ltr">${esc(c.user)}</td><td>${esc(brand(c.brandId).name)}</td><td><span class="tag ${c.active?'':'x'}">${c.active?'نشط':'موقوف'}</span></td><td><button class="g" onclick="togBA('${c.id}')">${c.active?'إيقاف':'تفعيل'}</button></td></tr>`).join('')}</table></div>`}
+function addCat(){const n=v('cn3').trim();if(!n)return;mb().cats.push({id:id(),name:n});save();render()}
+function delCat(i){const m=mb();m.cats=m.cats.filter(c=>c.id!==i);m.items=m.items.filter(x=>x.cat!==i);save();render()}
+function togIt(i){const x=mb().items.find(x=>x.id===i);x.av=x.av===false;save();render()}
+function delIt(i){const m=mb();m.items=m.items.filter(x=>x.id!==i);save();render()}
+function cancelEd(){ed=null;tmpImg='';render()}
+function readImg(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const s=Math.min(1,480/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);tmpImg=c.toDataURL('image/jpeg',.7);const p=document.getElementById('pv');p.src=tmpImg;p.style.display='block'};im.src=r.result};r.readAsDataURL(f)}
+function saveItem(){const m=mb();const n=v('in').trim(),p=+v('ip'),d2=document.getElementById('id2').checked,dp=+v('idp');if(!n||!(p>0)||!v('ic'))return say('اختر القسم واكتب الاسم والسعر',1);if(d2&&!(dp>0))return say('اكتب سعر الدبل',1);
+const old=ed&&m.items.find(x=>x.id===ed),o={cat:v('ic'),name:n,desc:v('ids').trim(),price:p,dbl:d2?dp:0,img:tmpImg||(old&&old.img)||'',av:old?old.av:true};if(old)Object.assign(old,o);else m.items.push({id:id(),...o});tmpImg='';ed=null;save();say('تم حفظ الصنف')}
+function bView(){const a=bcur();if(!a||!a.active){me=null;return render(),''}const b=brand(a.brandId),f=b.feat||{};
+if(view==='qrs')return `<div class="card"><b>${esc(b.name)}</b>${qrPanel(b)}</div>`;
+if(!f.menu)return '<div class="card">المنيو غير مفعّل لهذه العلامة. تواصل مع الإدارة.</div>';
+const m=mn(b),it=(ed&&m.items.find(x=>x.id===ed))||{};
+return `<div class="card"><b>الأقسام</b><div class="row"><input id="cn3" placeholder="اسم القسم"><button onclick="addCat()">إضافة قسم</button></div><div class="row">${m.cats.map(c=>`<span class="tag">${esc(c.name)} <a href="#" onclick="delCat('${c.id}');return false" aria-label="حذف">✕</a></span>`).join('')}</div></div>
+<div class="card"><b>${ed?'تعديل صنف':'صنف جديد'}</b><div class="row"><select id="ic"><option value="">القسم</option>${m.cats.map(c=>`<option value="${c.id}" ${it.cat===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><input id="in" placeholder="الاسم" value="${esc(it.name||'')}"><input id="ip" type="number" placeholder="السعر" value="${it.price||''}" style="width:90px"></div><div class="row"><input id="ids" placeholder="الوصف" value="${esc(it.desc||'')}" style="width:100%"></div><div class="row"><label><input type="checkbox" id="id2" ${it.dbl?'checked':''}> متاح دبل</label><input id="idp" type="number" placeholder="سعر الدبل" value="${it.dbl||''}" style="width:100px"><input type="file" accept="image/*" onchange="readImg(this)"><img id="pv" alt="" src="${it.img||''}" style="${it.img?'':'display:none;'}max-width:80px;border-radius:8px"></div><div class="row"><button onclick="saveItem()">حفظ</button>${ed?'<button class="g" onclick="cancelEd()">إلغاء</button>':''}</div></div>
+${m.cats.map(c=>`<div class="card"><b>${esc(c.name)}</b>${m.items.filter(x=>x.cat===c.id).map(x=>`<div class="row">${x.img?`<img src="${x.img}" alt="" style="width:46px;height:46px;object-fit:cover;border-radius:8px">`:''}<span>${esc(x.name)} · ${x.price}${x.dbl?' / دبل '+x.dbl:''}</span><button class="g" onclick="ed='${x.id}';tmpImg='';render()">تعديل</button><button class="g" onclick="togIt('${x.id}')">${x.av===false?'إتاحة':'نفد'}</button><button class="d" onclick="delIt('${x.id}')">حذف</button></div>`).join('')||'<small>لا أصناف</small>'}</div>`).join('')}`}
+async function login(){const u=v('us').toLowerCase().trim(),h=await H(v('pw'));
+if(lm==='a'){if(S.admin&&S.admin.email===u&&S.admin.h===h){me={role:'admin'};view='dash'}}
+else if(lm==='m'){const c=S.bAdmins.find(c=>c.user===u&&c.h===h);if(c){if(!c.active)return say('الحساب موقوف',1);me={role:'badmin',id:c.id};view='menu'}}
+else{const c=S.cashiers.find(c=>c.user===u&&c.h===h);if(c){if(!c.active)return say('الحساب موقوف',1);me={role:'cashier',id:c.id};view='work'}}
+if(me){msg=null;return render()}say('بيانات الدخول غير صحيحة',1)}
+function loginHtml(m){const N={a:'Admin',m:'أدمن المطعم',c:'كاشير'};const top=`<div class="top">${['a','m','c'].filter(x=>x!==lm).map(x=>`<button class="g" onclick="lm='${x}';msg=null;render()">${N[x]}</button>`).join('')}<b>سكويزر | SQUEEZER</b></div>`;let body;
+if(lm==='a'&&!S.admin)body=`<h2>إعداد المالك</h2><p>إعداد لمرة واحدة: أنشئ حساب مالك المنصة.</p>${m}<div class="row"><input id="em" placeholder="البريد" dir="ltr" type="email"></div><div class="row"><input id="pw" type="password" placeholder="كلمة المرور (8+)"></div><button onclick="setup()">إنشاء حساب المالك</button>`;
+else body=`<h2>${lm==='a'?'تسجيل دخول الإداري':lm==='m'?'أدمن المطعم':'كاشير'}</h2>${m}<div class="row"><input id="us" placeholder="${lm==='a'?'البريد':'اسم المستخدم'}" dir="ltr"></div><div class="row"><input id="pw" type="password" placeholder="كلمة المرور"></div><button onclick="login()">دخول</button>`;
+return top+`<div class="login card">${body}</div>`}
+function addC(i,k,sz){const it=mn(brand(i)).items.find(x=>x.id===k);if(!it||it.av===false)return;const key=k+sz;cart[key]=cart[key]||{n:it.name+(sz==='d'?' (دبل)':''),p:sz==='d'?it.dbl:it.price,q:0};cart[key].q++;render()}
+function decC(k){if(cart[k]&&--cart[k].q<1)delete cart[k];render()}
+function waUrl(i){const b=brand(i),L=Object.values(cart),tot=L.reduce((s,x)=>s+x.p*x.q,0);return 'https://wa.me/'+b.wa+'?text='+encodeURIComponent('طلب جديد من المنيو - '+b.name+'\n'+L.map(x=>'- '+x.q+'× '+x.n+' = '+x.p*x.q).join('\n')+'\nالإجمالي: '+tot+(note?'\nملاحظات/العنوان: '+note:''))}
+function mPage(i){const b=brand(i);if(!b||!(b.feat&&b.feat.menu))return['<div class="login card">المنيو غير متاح</div>','#56264F'];const m=mn(b);let tot=0,n=0;
+const L=Object.entries(cart).map(([k,x])=>{tot+=x.p*x.q;n+=x.q;return `<div class="row"><span>${x.q}× ${esc(x.n)} = ${x.p*x.q}</span><button class="g" onclick="decC('${k}')">−</button></div>`}).join('');
+const secs=m.cats.map(c=>`<h3>${esc(c.name)}</h3>`+m.items.filter(x=>x.cat===c.id&&x.av!==false).map(x=>`<div class="card"><div class="row">${x.img?`<img src="${x.img}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:10px">`:''}<div><b>${esc(x.name)}</b><br><small>${esc(x.desc||'')}</small></div></div><div class="row"><button onclick="addC('${b.id}','${x.id}','s')">${x.dbl?'سنجل ':''}${x.price}</button>${x.dbl?`<button onclick="addC('${b.id}','${x.id}','d')">دبل ${x.dbl}</button>`:''}</div></div>`).join('')).join('');
+return[`<main><h2>${esc(b.ic||'')} ${esc(b.name)}</h2>${secs||'<small>المنيو فارغ</small>'}<div class="card" style="position:sticky;bottom:8px"><b>طلبك (${n})</b>${L}<div class="row"><input placeholder="الاسم / رقم الطاولة / العنوان" value="${esc(note)}" oninput="note=this.value"><b>الإجمالي ${tot}</b></div>${b.wa?`<a href="#" target="_blank" rel="noopener" onclick="if(!${n})return false;this.href=waUrl('${b.id}')" style="display:block;text-align:center;padding:10px;border-radius:10px;background:var(--p);color:var(--bt);text-decoration:none">إرسال الطلب عبر واتساب</a>`:'<small>رقم واتساب المطعم غير مضاف</small>'}</div></main>`,b.color]}
+async function genRev(i){const b=brand(i),t=document.getElementById('rt');if(!t)return;t.value='...';
+try{const s=await claude.use('sample');if(!s)throw 0;const r=await s('اكتب تقييمًا قصيرًا (جملتان إلى ثلاث) بالعربية بلهجة مصرية بسيطة لعميل زار "'+b.name+'" (نشاط: '+b.cat+'). كن إيجابيًا ولا تخترع تفاصيل محددة مثل أسماء أطباق أو أسعار. أعد نص التقييم فقط.',{cache:false});t.value=r.text.trim()}catch(e){t.value=FB[Math.floor(Math.random()*FB.length)].replace('{n}',b.name)}}
+function copyRev(){const t=document.getElementById('rt');if(!t)return;t.select();try{document.execCommand('copy')}catch(e){}try{navigator.clipboard.writeText(t.value)}catch(e){}}
+function rPage(i){const b=brand(i);if(!b||!(b.feat&&b.feat.rev&&b.gmap))return['<div class="login card">صفحة التقييم غير متاحة</div>','#56264F'];setTimeout(()=>genRev(i),30);
+return[`<div class="login card" style="border-top:8px solid var(--p);text-align:center"><h2>${esc(b.ic||'')} ${esc(b.name)}</h2><p>شكرًا لزيارتك! اقتراح تقييم جاهز، تقدر تعدّله:</p><textarea id="rt" rows="5" style="width:100%;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)"></textarea><div class="row" style="justify-content:center"><button class="g" onclick="genRev('${b.id}')">اقتراح آخر ✨</button></div><a href="${esc(b.gmap)}" target="_blank" rel="noopener" onclick="copyRev()" style="display:block;padding:10px;border-radius:10px;background:var(--p);color:var(--bt);text-decoration:none">انسخ وافتح جوجل ماب للتقييم</a><small>الصق النص في خانة التقييم واختر النجوم ثم أرسل.</small></div>`,b.color]}
+function route(){const h=location.hash;let m;if(m=h.match(/^#b-([\w-]+)$/))return cPage(m[1]);if(m=h.match(/^#m-([\w-]+)$/))return mPage(m[1]);if(m=h.match(/^#r-([\w-]+)$/))return rPage(m[1]);return null}
+function render(){const A=document.getElementById('app');A.style.cssText='';const R=route();if(R){A.style.cssText=th(R[1]);return A.innerHTML=R[0]}const m=msg?`<div class="msg ${msg.e?'e':''}" role="status">${esc(msg.m)}</div>`:'';
+if(!me)return A.innerHTML=loginHtml(m);if(!S.admin)return A.innerHTML=`<div class="login card"><h2>سكويزر | SQUEEZER</h2><p>إعداد أولي لمرة واحدة: أنشئ حساب مالك المنصة.</p>${m}<div class="row"><input id="em" placeholder="البريد" dir="ltr" type="email"></div><div class="row"><input id="pw" type="password" placeholder="كلمة المرور (8+)"></div><button onclick="setup()">إنشاء حساب المالك</button></div>`;
+if(!me)return A.innerHTML=`<div class="login card"><h2>سكويزر | SQUEEZER</h2>${m}<div class="row"><select id="rl"><option value="admin">مالك المنصة</option><option value="cashier">كاشير</option></select></div><div class="row"><input id="us" placeholder="البريد أو اسم المستخدم" dir="ltr"></div><div class="row"><input id="pw" type="password" placeholder="كلمة المرور"></div><button onclick="login()">دخول</button></div>`;
+const ad=me.role==='admin';if(!ad)A.style.cssText=me.role==='badmin'?(bcur()?th(brand(bcur().brandId).color):''):themeOf();A.innerHTML=`<div class="top"><b>سكويزر</b>${me.role==='badmin'?nav([['menu','المنيو'],['qrs','الأكواد']]):''}${ad?nav([['dash','لوحة التحكم'],['brands','العلامات'],['cash','الكاشير'],['cust','العملاء'],['ba','أدمن المطعم'],['log','السجل']]):''}<button class="g" onclick="logout()">خروج</button></div><main>${m}${ad?adminView():me.role==='badmin'?bView():cashierView()}</main>`}
+render();
+</script></body></html>
